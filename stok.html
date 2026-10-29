@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stok Bahan Ajar - SITTA</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <a class="logo" href="index.html">SITTA <span>Universitas Terbuka</span></a>
+    <nav><a class="active" href="stok.html">Stok Bahan Ajar</a><a href="tracking.html">Tracking DO</a></nav>
+  </header>
+
+  <main class="container" id="app" v-cloak>
+    <div class="page-heading">
+      <div><p class="label">MANAJEMEN PERSEDIAAN</p><h1>Stok Bahan Ajar</h1><p class="muted">Kelola dan pantau ketersediaan bahan ajar.</p></div>
+      <button class="button primary" @click="bukaTambah">+ Tambah Bahan Ajar</button>
+    </div>
+
+    <section class="summary">
+      <div class="summary-card"><span>Total bahan ajar</span><strong>{{ stok.length }}</strong></div>
+      <div class="summary-card"><span>Stok menipis</span><strong>{{ jumlahMenipis }}</strong></div>
+      <div class="summary-card"><span>Stok kosong</span><strong>{{ jumlahKosong }}</strong></div>
+    </section>
+
+    <section class="card">
+      <h2>Filter dan Pencarian</h2>
+      <div class="filters">
+        <label>UT-Daerah
+          <select v-model="filterUpbjj">
+            <option value="">Semua UT-Daerah</option>
+            <option v-for="daerah in upbjjList" :key="daerah" :value="daerah">{{ daerah }}</option>
+          </select>
+        </label>
+        <label>Kategori
+          <select v-model="filterKategori" :disabled="!filterUpbjj">
+            <option value="">Semua kategori</option>
+            <option v-for="kategori in kategoriTersedia" :key="kategori" :value="kategori">{{ kategori }}</option>
+          </select>
+        </label>
+        <label>Status stok
+          <select v-model="filterStok">
+            <option value="semua">Semua stok</option>
+            <option value="menipis">Di bawah safety stock</option>
+            <option value="kosong">Stok kosong</option>
+          </select>
+        </label>
+        <label>Urutkan
+          <select v-model="sortBy">
+            <option value="judul">Nama mata kuliah</option>
+            <option value="qty">Jumlah stok</option>
+            <option value="harga">Harga</option>
+          </select>
+        </label>
+        <label class="search">Cari kode atau judul
+          <input type="search" v-model.trim="kataKunci" placeholder="Ketik kata kunci...">
+        </label>
+        <div class="filter-button"><button class="button secondary" @click="resetFilter">Reset Filter</button></div>
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Kode / Nama Mata Kuliah</th><th>Kategori</th><th>UT-Daerah</th><th>Lokasi Rak</th><th>Stok</th><th>Safety</th><th>Status</th><th>Catatan</th><th>Aksi</th></tr></thead>
+          <tbody>
+            <tr v-for="item in stokTersaring" :key="item.kode">
+              <td><strong>{{ item.kode }}</strong><br>{{ item.judul }}</td>
+              <td>{{ item.kategori }}</td><td>{{ item.upbjj }}</td><td>{{ item.lokasiRak }}</td>
+              <td>{{ item.qty }}</td><td>{{ item.safety }}</td>
+              <td><span class="status" :class="kelasStatus(item)">{{ statusStok(item) }}</span></td>
+              <td><span v-html="item.catatanHTML"></span></td>
+              <td><button class="button small secondary" @click="bukaEdit(item)">Edit</button></td>
+            </tr>
+            <tr v-if="stokTersaring.length === 0"><td colspan="9" class="empty">Data tidak ditemukan.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="table-note">Menampilkan {{ stokTersaring.length }} dari {{ stok.length }} bahan ajar.</p>
+    </section>
+
+    <div class="modal-background" v-if="formTerbuka" @click.self="tutupForm">
+      <section class="modal">
+        <div class="modal-title"><h2>{{ modeEdit ? 'Edit Bahan Ajar' : 'Tambah Bahan Ajar' }}</h2><button class="close" @click="tutupForm">×</button></div>
+        <p class="error" v-if="pesanError">{{ pesanError }}</p>
+        <form @submit.prevent="simpanBahanAjar">
+          <div class="form-grid">
+            <label>Kode Mata Kuliah *
+              <input v-model.trim="form.kode" :disabled="modeEdit" required maxlength="20" placeholder="Contoh: MKDU4101">
+            </label>
+            <label>Nama Mata Kuliah *
+              <input v-model.trim="form.judul" required maxlength="100">
+            </label>
+            <label>Kategori *
+              <select v-model="form.kategori" required><option disabled value="">Pilih kategori</option><option v-for="kategori in kategoriList" :key="kategori" :value="kategori">{{ kategori }}</option></select>
+            </label>
+            <label>UT-Daerah *
+              <select v-model="form.upbjj" required><option disabled value="">Pilih UT-Daerah</option><option v-for="daerah in upbjjList" :key="daerah" :value="daerah">{{ daerah }}</option></select>
+            </label>
+            <label>Lokasi Rak *
+              <input v-model.trim="form.lokasiRak" required>
+            </label>
+            <label>Harga *
+              <input type="number" v-model.number="form.harga" min="0" required>
+            </label>
+            <label>Jumlah Stok *
+              <input type="number" v-model.number="form.qty" min="0" step="1" required>
+            </label>
+            <label>Safety Stock *
+              <input type="number" v-model.number="form.safety" min="0" step="1" required>
+            </label>
+            <label class="full">Catatan
+              <textarea v-model.trim="form.catatan" rows="2"></textarea>
+            </label>
+          </div>
+          <div class="modal-actions"><button type="button" class="button secondary" @click="tutupForm">Batal</button><button type="submit" class="button primary">Simpan</button></div>
+        </form>
+      </section>
+    </div>
+    <footer class="footer">SITTA • <a href="index.html">Kembali ke menu utama</a></footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.js"></script>
+  <script src="js/dataBahanAjar.js"></script>
+  <script src="js/stok-app.js"></script>
+</body>
+</html>
